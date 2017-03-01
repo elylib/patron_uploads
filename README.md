@@ -8,6 +8,7 @@ Works off a CLI (command-line interface). The only argument is the path to the f
 
 ###Exampe Usage
 \>\> python conversion.py 'data/opac\_students1.txt'
+
 **Output**: A tsv file formatted for OCLC to send to the FTP server.
 
 If either the barcode or idAtSource (essentially their student username) field is duplicated, it will not write the second one to the file and print out the ID that is in error. You can investigate the file to find what is causing the mixup and edit the script as needed to work around it.
