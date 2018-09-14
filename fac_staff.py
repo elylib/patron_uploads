@@ -1,5 +1,8 @@
 """
 We get Faculty/Staff data from payroll to load into Worldshare Management Services.
+
+Currently this file comes from Melissa Cody.
+
 This code reads that file and transforms the data into the format WMS expects.
 It also constructs university IDs and let's the user know if any conflicts exist,
 i.e. John Smith and Jane Smith both would have university IDs of jsmith, so the
@@ -12,6 +15,10 @@ Fac/Staff accounts in WMS each year.
 import csv
 from pprint import pprint
 import string
+
+import openpyxl
+
+from constants import OCLC_FIELDS
 
 
 def make_wsu_username(first, last):
@@ -44,8 +51,8 @@ def make_email(user):
 
 def main(file_location, today):
     year, month, day = today.year, today.month, today.day
-
-    with open(file_location, 'rt') as f, open(f'WEX_{year}_{month}_{day}_StaffPatrons_1_Tab_1.1.txt', 'w', newline="") as w:
+    sheet = openpyxl.load_workbook(file_location).active
+    with open(f'WEX_{year}_{month}_{day}_StaffPatrons_1_Tab_1.1.txt', 'w', newline="") as w:
         """
         This is not necessarily the ideal way to go about this (lining up two lists
         for field names and data rows), but this iteration is working. Some information
@@ -56,41 +63,26 @@ def main(file_location, today):
         likely to have errors because either a duplicate user id or a space in the last
         name.
         """
-        reader = csv.reader(f, delimiter='\t')
-        next(reader, None)
         writer = csv.writer(w, delimiter='\t')
-        writer.writerow(['prefix', 'givenName', 'middleName', 'familyName', 'suffix', 'nickname',
-                         'canSelfEdit', 'dateOfBirth', 'gender', 'institutionId', 'barcode', 'idAtSource',
-                         'sourceSystem', 'borrowerCategory', 'circRegistrationDate', 'oclcExpirationDate',
-                         'homeBranch', 'primaryStreetAddressLine1', 'primaryStreetAddressLine2',
-                         'primaryCityOrLocality', 'primaryStateOrProvince', 'primaryPostalCode',
-                         'primaryCountry', 'primaryPhone', 'secondaryStreetAddressLine1', 'secondaryStreetAddressLine2',
-                         'secondaryCityOrLocality', 'secondaryStateOrProvince', 'secondaryPostalCode',
-                         'secondaryCountry', 'secondaryPhone', 'emailAddress', 'mobilePhone', 'notificationEmail',
-                         'notificationTextPhone', 'patronNotes', 'photoURL', 'customdata1', 'customdata2',
-                         'customdata3', 'customdata4', 'username', 'illId', 'illApprovalStatus',
-                         'illPatronType', 'illPickupLocation'])
+        writer.writerow(OCLC_FIELDS)
         usernames = set()
         barcodes = set()
         double_check = []
-        for row in reader:
+        for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
+            row = [cell.value for cell in row]
             if row[6] in barcodes:
                 # The file from payroll includes some people multiple times, i.e. if they teach in the
                 # day and CGCE units, they are listed as employees in two areas. This will skip them
                 # if we've already seen them.
                 continue
             username = make_wsu_username(row[3].lower(), row[2].lower())
-            # We should check to see if this should remain 5 or be shortened
-            # Currently, this means users accounts will stay open up to four years after they leave (assuming they leave
-            # one year after this report is uploaded
-            # BEWARE: If you open this in Excel to do cleanup, make sure it doesn't autoformat you into
-            # a way OCLC won't accept. Pay special attention to date (they will only accept yyyy-mm-dd)
-            # and barcodes, because theose are the most likely places something will get auto-formatted.
-            expiration_date = today.replace(year=today.year + 3)
+            # All these empty strings are to make sure the format of the tsv is just so
+            # Should probably make the facstaff upload more like the student upload
+            expiration_date = today.replace(year=today.year + 3).strftime('%Y-%m-%d')
             new_row = ['', row[3], '', row[2], '', '', '', '', '', '1410', row[6], username, 'urn:mace:oclc:idm:westfieldstatecollege:ldap',
-                       'Faculty and Staff', '', expiration_date.strftime('%Y-%m-%d'), '134347', row[4],
+                       'Faculty and Staff', '', expiration_date, '134347', row[4],
                        '577 Western Avenue', 'Westfield', 'MA', '01086', '', '', '', '', '', '', '', '', '',
-                       make_email(username)]
+                       make_email(username), '', '', '', '', '', '', '', '', '', '', '', '', '', '']
             writer.writerow(new_row)
             # This makes it so we can double check people who may be given an incorrect or duplicate
             # idAtSource value, so we can double check them in the directory

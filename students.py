@@ -1,39 +1,15 @@
 import csv
 from collections import namedtuple
 
-# OCLC requires these 46 field names in this order to accept a patron upload
-OCLCRecord = namedtuple('OCLCRecord', 'prefix givenName middleName familyName suffix nickname canSelfEdit dateOfBirth '
-                                      'gender institutionId barcode idAtSource sourceSystem borrowerCategory '
-                                      'circRegistrationDate oclcExpirationDate homeBranch primaryStreetAddressLine1 '
-                                      'primaryStreetAddressLine2 primaryCityOrLocality primaryStateOrProvince '
-                                      'primaryPostalCode primaryCountry primaryPhone secondaryStreetAddressLine1 '
-                                      'secondaryStreetAddressLine2 secondaryCityOrLocality secondaryStateOrProvince '
-                                      'secondaryPostalCode secondaryCountry secondaryPhone emailAddress mobilePhone '
-                                      'notificationEmail notificationTextPhone patronNotes photoURL customdata1 '
-                                      'customdata2 customdata3 customdata4 username illId illApprovalStatus '
-                                      'illPatronType illPickupLocation')
+import openpyxl
 
+from constants import OCLC_FIELDS, BANNER_FIELDS, SCRUB_FIELDS
+
+
+OCLCRecord = namedtuple('OCLCRecord', ' '.join(OCLC_FIELDS))
 # Small metaprogramming black magic. Lets us initialize an OCLC Record with the Banner subset, and not worry about
 # not immediately (or ever) setting other fields.
 OCLCRecord.__new__.__defaults__ = (None,) * len(OCLCRecord._fields)
-
-# The record output by banner. The only difference is oclcExpirationDate is circExpirationDate in the file.
-# OCLC changed this field, so we make the change here until Banner is updated.
-BannerFields = ('givenName', 'familyName', 'dateOfBirth', 'gender', 'institutionId', 'barcode', 'idAtSource',
-                'sourceSystem', 'borrowerCategory', 'oclcExpirationDate', 'homeBranch', 'primaryStreetAddressLine1',
-                'primaryStreetAddressLine2', 'primaryCityOrLocality', 'primaryStateOrProvince', 'primaryPostalCode',
-                'primaryCountry', 'primaryPhone', 'secondaryStreetAddressLine1', 'secondaryStreetAddressLine2',
-                'secondaryCityOrLocality', 'secondaryStateOrProvince', 'secondaryPostalCode', 'secondaryCountry',
-                'secondaryPhone', 'emailAddress', 'mobilePhone', 'patronNotes')
-
-# These fields contain Personally Identifiable Information that we do not actual need
-# So there is no reason to send someone's home address to OCLC, or to store it where
-# student workers can look it up, etc.
-ScrubTheseFields = {'dateOfBirth', 'gender', 'primaryStreetAddressLine1', 'primaryStreetAddressLine2',
-                    'primaryCityOrLocality', 'primaryStateOrProvince', 'primaryPostalCode', 'primaryCountry',
-                    'primaryPhone', 'secondaryStreetAddressLine1', 'secondaryStreetAddressLine2',
-                    'secondaryCityOrLocality', 'secondaryStateOrProvince', 'secondaryPostalCode',
-                    'secondaryCountry', 'secondaryPhone', 'mobilePhone'}
 
 
 class Duplicate(Exception):
@@ -46,7 +22,7 @@ seen = set()
 
 def scrub_banner(banner):
     for key in banner.keys():
-        if key in ScrubTheseFields:
+        if key in SCRUB_FIELDS:
             banner[key] = ''
     return banner
 
@@ -65,10 +41,10 @@ def banner_to_oclc(csv_row, today):
     :return: An OCLCRecord namedtuple with the fields mapped from the Banner fields.
     :raise: Duplicate if we've already seen this one.
     """
-    banner = scrub_banner(dict(zip(BannerFields, csv_row)))
+    banner = scrub_banner(dict(zip(BANNER_FIELDS, csv_row)))
 
-    five_years_from_today = today.replace(year=today.year + 3)
-    banner['oclcExpirationDate'] = five_years_from_today.strftime('%Y-%m-%d')
+    # expiration date will be updated to 3 years from upload every time
+    banner['oclcExpirationDate'] = today.replace(year=today.year + 3).strftime('%Y-%m-%d')
 
     if banner['idAtSource'] in seen or banner['barcode'] in seen:
         raise Duplicate
@@ -79,16 +55,17 @@ def banner_to_oclc(csv_row, today):
 
 
 def main(file_location, today):
-    with open(file_location, 'r') as f, open('StudentPatrons_WEX_' + today.strftime('%Y%m%d') + '_1.txt', 'w', newline='') as w:
-        reader, writer = csv.reader(f, delimiter='\t'), csv.writer(w, delimiter='\t')
-        next(reader)  # skip header
+    sheet = openpyxl.load_workbook(file_location).active
+    with open('StudentPatrons_WEX_' + today.strftime('%Y%m%d') + '_1.txt', 'w', newline='') as w:
+        writer = csv.writer(w, delimiter='\t')
         writer.writerow(OCLCRecord._fields)
-
-        for patron_row in reader:
+        for patron_row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
             try:
-                patron = banner_to_oclc(patron_row, today)
+                patron = banner_to_oclc([cell.value for cell in patron_row], today)
             except Duplicate:
-                print(patron_row[6])
+                # If there is a duplicate, you will need to look at it and use your judgement as to what
+                # to do. OCLC will not accept duplicate patron names
+                print([cell.value for cell in patron_row])
                 continue
 
             writer.writerow(patron._asdict().values())
