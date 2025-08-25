@@ -1,0 +1,104 @@
+---
+title: "WEX Test 2 Report in Argos: Nickname Column Included"
+format: 
+  html:
+    theme: journal
+    code-overflow: wrap  # Sets word wrap for all code blocks in HTML output
+date: August 25, 2025
+author: Andrea Puglisi
+---
+
+### **Summary of Activity**
+
+Working with university IT, IT developed **Student Patrons WEX Test2 Report** in Argos, the university's new reporting system, which adheres to our bulk patron template required by OCLC. In addition, university IT was able to create a template to pre-fill columns such as borrowerCategory (Student) and idAtSource, while removing dateOfBirth, gender, address information automatically. This is a significant improvement.
+
+Student Patrons WEX Test1 did not maintain the template structure from the previous reporting system, and along with the Head of Access Services, I worked along with IT on resolving the issues that presented.
+
+------------------------------------------------------------------------
+
+### Fall 2025 Bulk Student Uploads Test
+
+*Through this process I learned that it would be best to have Argos report generate as an .xslx not as a .csv due to date formatting requirements. While the script below can and does a few remaining tidying tasks, such as ensuring that nickname cells only contain contents which differ from givenName and setting the oclcExpirationDate, it is still recommended to open the written (exported) .xslx file to make sure it looks okay before converting it to a tab-delimited.tsv file (must save as tab-delimited.txt and then rename to .tsv). OCLC systems are only able to process .tsv*
+
+### Template Instructions: Follow the #Comments to update file names 
+
+```{r Fall 2025 Student Uploads}
+library(openxlsx)
+library(tidyverse)
+library(readxl)
+library(dplyr)
+
+#Step 1: Read in the data
+
+fall_2025_student_list <- read_excel("Student Patrons WEX Test2 Report_20250825_115315_2x.xlsx") %>% #Update file names
+  mutate(across(everything(), as.character)) %>%
+  mutate(across(everything(), ~replace(.x, is.na(.x), "")))
+  View(fall_2025_student_list) #Update file name to match above
+
+#Step 2, PreferredNames Report, helpful for Head of Access Services/UX Librarian:
+  preferred_names_fall_2025_list <- fall_2025_student_list %>% #Update file name to match Step 1 structure
+  filter(givenName != nickname)
+  View(preferred_names_fall_2025_list) #Update filename
+
+#Step 3, Save Preferred Names Report
+write.csv(preferred_names_fall_2025_list, "2-2025_fall_preferred_names_list.csv") #Update filenames
+  
+#Step 4, Ensures that prefilled nickname cells only contain contents that differ from givenName; Manually set oclcExpirationDate to 4 years into the future
+
+fall_2025_students_nicknames_added <- fall_2025_student_list %>% #Update filenames
+  mutate(nickname = if_else(nickname != "" & nickname != givenName, nickname, ""), 
+    oclcExpirationDate = as.Date("2029-07-01"), #Set OCLC expiration date manually
+    oclcExpirationDate = format(oclcExpirationDate, "%Y-%m-%d")) %>% #Ensure format is YYYY-MM-DD as character when you View sheet
+  mutate(across(everything(), as.character))
+
+#Review, export, and then open in Excel before converting to tab-delimited .tsv for OCLC
+View(fall_2025_students_nicknames_added) #Update filename
+write.xlsx(fall_2025_students_nicknames_added, "ap-test_wex_2025_fall_students.xlsx", rowNames = FALSE) #Update filenames
+```
+
+### Do Not Edit: Sample Template
+
+*This is a back-up copy of R script that can be used to identify patron's preferred names from Argos Bulk Student Report, and set patron account expiration date. This template uses Fall 2025 as an example and contains detailed explanatory information about the script.*
+
+#### Set-up Requirement
+
+Create a patron uploads folder, and a Bulk Patron Upload RStudio Project.
+
+When doing bulk patron uploads, open the Bulk Patron Upload project so that settings and installed packages load. The Bulk Patron Upload Project should have the tidyverse , readxl, writeexcel, dplyr packages installed.
+
+```{r test-phase-part-2,eval=FALSE}
+
+library(openxlsx) #needed to write XSLX
+library(tidyverse) #Download via CRAN and install in project environment
+library(readxl) #Need this package in order to "read in" .xlsx files
+library(dplyr) #Need this in order to use the pipe, relocate, mutate and filter functions
+
+#Step 1: Read in the data; remove NAs that populate upon import
+
+fall_2025_student_list <- read_excel("Student Patrons WEX Test2 Report_20250825_115315_2x.xlsx") %>% #This imports the file into RStudio; the %>% symbols form what is called a pipe, and effectively says "take this, and then do that" -- it is a connecting operator
+  mutate(across(everything(), as.character)) %>% # convert all columns to character
+  mutate(across(everything(), ~replace(.x, is.na(.x), ""))) # replace any NA with blank
+  View(fall_2025_student_list) #View the file in its own window in RStudio. Good idea to look at it and make sure it looks okay.
+
+#Step 2, PreferredNames Report, helpful for Head of Access Services/UX Librarian: This creates a report that contains preferredNames by using the filter() function from library(dplyr).
+  preferred_names_fall_2025_list <- fall_2025_student_list %>%
+  filter(givenName != nickname)
+  View(preferred_names_fall_2025_list) #Using View() in console to show results in RStudio as its own document
+
+#Step 3, Save Preferred Names List:
+write.xlsx(preferred_names_fall_2025_list, "2025_fall_preferred_names_list.xlsx") #Save a .csv of preferred names to your computer
+  
+#Step 4, In this iteration, IT was able to create a report in Argos that prefills "nickname" column with Preferred Names. In the university system, Preferred Names will maintain the student's "givenName" as their Preferred Name unless specified. Based on how the "nickname" column contains Preferred Names (including givenName and alternate), it is best to remove redundant data, so that only names that differ from givenName appear remain in the nickname field. The following step attempts to accomplish this task!  
+
+fall_2025_students_nicknames_added <- fall_2025_student_list %>%
+  mutate(nickname = if_else(nickname != "" & nickname != givenName, nickname, ""), # #Only keep nicknames that differ from givenName
+    oclcExpirationDate = as.Date("2029-07-01"), #Set OCLC expiration date manually
+    oclcExpirationDate = format(oclcExpirationDate, "%Y-%m-%d")) %>% #Ensure format is YYYY-MM-DD as character
+  mutate(across(everything(), as.character))  #keep all columns as characters. This is needed in order to maintain earlier direction to convert into characters; ideal for keeping numerics registering as characters and compatible with OCLC requirements.
+
+#Review, export, and then open in Excel before converting to tab-delimited .tsv for OCLC
+
+View(fall_2025_students_nicknames_added) #Preview in RStudio
+
+write.xlsx(fall_2025_students_nicknames_added, "ap-test_wex_2025_fall_students.xlsx", rowNames = FALSE) #Export and saved on computer
+```
