@@ -1,26 +1,34 @@
 ---
-title: "WEX Test 2 Report in Argos: Nickname Column Included"
+title: "WEX Bulk Student Report in Argos: Tidying Template"
 format: 
   html:
     theme: journal
     code-overflow: wrap  # Sets word wrap for all code blocks in HTML output
-date: August 25, 2025
+date: August 26, 2025
 author: Andrea Puglisi
 ---
 
-### **Summary of Activity**
+### **Context**
 
-Working with university IT, IT developed **Student Patrons WEX Test2 Report** in Argos, the university's new reporting system, which adheres to our bulk patron template required by OCLC. In addition, university IT was able to create a template to pre-fill columns such as borrowerCategory (Student) and idAtSource, while removing dateOfBirth, gender, address information automatically. This is a significant improvement.
-
-Student Patrons WEX Test1 did not maintain the template structure from the previous reporting system, and along with the Head of Access Services, I worked along with IT on resolving the issues that presented.
+Working with university IT, IT developed **WEX Bulk Student Report** in Argos, the university's new reporting system, which adheres to our bulk patron template required by OCLC. In addition, university IT was able to create a template to pre-fill columns such as borrowerCategory (Student) and idAtSource, while removing dateOfBirth, gender, address, mobile phone, information automatically. This is a significant improvement.
 
 ------------------------------------------------------------------------
 
-### Fall 2025 Bulk Student Uploads Test
+### Script Summary
 
-*Through this process I learned that it would be best to have Argos report generate as an .xslx not as a .csv due to date formatting requirements. While the script below can and does a few remaining tidying tasks, such as ensuring that nickname cells only contain contents which differ from givenName and setting the oclcExpirationDate, it is still recommended to open the written (exported) .xslx file to make sure it looks okay before converting it to a tab-delimited.tsv file (must save as tab-delimited.txt and then rename to .tsv). OCLC systems are only able to process .tsv*
+The script below can and does a few required tidying tasks, such as ensuring that nickname cells only contain contents which differ from givenName and setting the oclcExpirationDate. The oclcExpirationDate must be manually set for 07-01, 5 years into the future, following YYYY-MM-DD format.
 
-### Template Instructions: Follow the #Comments to update file names 
+### About the Process of Importing and Exporting Bulk Student Data into RStudio
+
+Instructions on how to download the report from Argos are included on the library's Systems Intranet Guide.
+
+The WEX Bulk Student Report downloads as a .csv file (no xlsx option is available). It is recommended to open the file in Excel before importing into R for this process. Please save the .csv report as an .xlsx *before* completing this process.
+
+The R script writes two .xlsx files. Following the completion of this process, open the tidied file in Excel and make sure it looks as expected (check dates, and nicknames). Then, save the file as a tab-delimited text file onto computer, and after saving, change the file extension to a .tsv per OCLC. This is the same step that must be completed if using the process to tidy in Excel.
+
+------------------------------------------------------------------------
+
+### Template Instructions: Follow the #Comments & update file names
 
 ```{r Fall 2025 Student Uploads}
 library(openxlsx)
@@ -53,14 +61,14 @@ fall_2025_students_nicknames_added <- fall_2025_student_list %>% #Update filenam
 
 #Review, export, and then open in Excel before converting to tab-delimited .tsv for OCLC
 View(fall_2025_students_nicknames_added) #Update filename
-write.xlsx(fall_2025_students_nicknames_added, "ap-test_wex_2025_fall_students.xlsx", rowNames = FALSE) #Update filenames
+write.xlsx(fall_2025_students_nicknames_added, "wex_2025_fall_students.xlsx", rowNames = FALSE) #Update filenames
 ```
 
 ### Do Not Edit: Sample Template
 
 *This is a back-up copy of R script that can be used to identify patron's preferred names from Argos Bulk Student Report, and set patron account expiration date. This template uses Fall 2025 as an example and contains detailed explanatory information about the script.*
 
-#### Set-up Requirement
+#### RStudio Set-up Requirements
 
 Create a patron uploads folder, and a Bulk Patron Upload RStudio Project.
 
